@@ -1,1 +1,2 @@
-
+mkdir -p generator
+touch generator/__init__.py
