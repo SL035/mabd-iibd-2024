@@ -5,6 +5,9 @@ import uuid
 from datetime import datetime, timedelta
 from faker import Faker
 from dateutil import tz
+from confluent_kafka import Producer
+import json
+import sys
 
 fake = Faker()
 
@@ -51,14 +54,39 @@ def generate_event(now: datetime):
         "value": value
     }
 
+def delivery_report(err, msg):
+    if err is not None:
+        print(f'Ошибка доставки: {err}')
+
 def main():
-    print("Запуск генератора данных... (Ctrl+C для остановки)")
+    # Конфигурация продюсера
+    conf = {
+        'bootstrap.servers': 'localhost:9092',
+        'client.id': 'data-generator'
+    }
+    producer = Producer(conf)
+    topic = 'events'
+
+    print("Запуск генератора → отправка в Redpanda...")
+    
+    def signal_handler(sig, frame):
+        print('\nОстановка генератора...')
+        producer.flush()
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     while True:
         now = datetime.now(tz=tz.tzlocal())
         event = generate_event(now)
-        print(json.dumps(event))
-        # Пауза: в среднем 1 событие в секунду, но с вариациями
-        time.sleep(random.expovariate(1.0))  # экспоненциальное распределение
+        producer.produce(
+            topic,
+            key=str(event["user_id"]),
+            value=json.dumps(event, ensure_ascii=False).encode('utf-8'),
+            callback=delivery_report
+        )
+        producer.poll(0)  # обрабатывает колбэки
+        time.sleep(random.expovariate(1.0))  # ~1 событие/сек
 
 if __name__ == "__main__":
     main()
