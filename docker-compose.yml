@@ -50,6 +50,18 @@ services:
     environment:
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
 
+  grafana:
+    image: grafana/grafana:10.3.3
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
+    volumes:
+      - ./dashboard/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - clickhouse
+
 volumes:
   redpanda_data: {}
   clickhouse_data: {}
