@@ -1,0 +1,43 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.5
+    command:
+      - redpanda
+      - start
+      - --smp
+      - '1'
+      - --overprovisioned
+      - --node-id
+      - '0'
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+
+  generator:
+    build:
+      context: .
+      dockerfile: Dockerfile.generator
+    depends_on:
+      - redpanda
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile.collector
+    depends_on:
+      - redpanda
+    environment:
+      - PYTHONUNBUFFERED=1
+
+volumes:
+  redpanda_data: {}
