@@ -2,23 +2,33 @@
 from confluent_kafka import Consumer, KafkaException
 import json
 import sys
+import clickhouse_connect
+from datetime import datetime
+import pytz
 
 def main():
-    conf = {
-    'bootstrap.servers': 'redpanda:9092',
-    'group.id': 'collector-group',
-    'auto.offset.reset': 'earliest',
-    'security.protocol': 'PLAINTEXT',
-    'api.version.request': True,
-    'broker.version.fallback': '3.0.0',  # ← КЛЮЧЕВОЙ ПАРАМЕТР
-    'api.version.fallback.ms': 0
+    # Kafka
+    kafka_conf = {
+        'bootstrap.servers': 'redpanda:9092',
+        'group.id': 'collector-group',
+        'auto.offset.reset': 'earliest',
+        'security.protocol': 'PLAINTEXT',
+        'api.version.request': True,
+        'broker.version.fallback': '3.0.0'
     }
+    consumer = Consumer(kafka_conf)
+    consumer.subscribe(['events'])
 
-    consumer = Consumer(conf)
-    topic = 'events'
-    consumer.subscribe([topic])
+    # ClickHouse
+    ch_client = clickhouse_connect.get_client(
+        host='clickhouse',
+        port=8123,
+        database='events_db'
+    )
+    print("📡 Сборщик запущен → запись в ClickHouse...")
 
-    print("Сборщик запущен. Ожидание событий из Redpanda...")
+    batch = []
+    BATCH_SIZE = 100
 
     try:
         while True:
@@ -30,13 +40,42 @@ def main():
                     continue
                 else:
                     raise KafkaException(msg.error())
-            
+
             event = json.loads(msg.value().decode('utf-8'))
-            print(f"✅Получено: {event['event_type']} | user={event['user_id']} | ts={event['timestamp']}")
+            # Преобразуем строку ISO в datetime с временной зоной UTC
+            ts_str = event['timestamp']
+            # Убираем лишние символы, если есть (например, +00:00 → Z)
+            if ts_str.endswith('+00:00'):
+                ts_str = ts_str[:-6] + 'Z'
+            # Парсим
+            event_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).replace(tzinfo=pytz.UTC)
+
+            batch.append([
+                event['event_id'],
+                event['user_id'],
+                event['event_type'],
+                event['product_id'],
+                event_time,
+                event['session_id'],
+                event['value']
+            ])
+
+            if len(batch) >= BATCH_SIZE:
+                ch_client.insert(
+                    'events_db.events',
+                    batch,
+                    column_names=['event_id', 'user_id', 'event_type', 'product_id', 'timestamp', 'session_id', 'value']
+                )
+                print(f"Вставлено {len(batch)} событий в ClickHouse")
+                batch.clear()
+
     except KeyboardInterrupt:
-        pass
+        if batch:
+            ch_client.insert('events_db.events', batch, column_names=...)
+            print(f"Финальная вставка {len(batch)} событий")
     finally:
         consumer.close()
+        ch_client.close()
 
 if __name__ == "__main__":
     from confluent_kafka.error import KafkaError

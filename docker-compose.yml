@@ -39,5 +39,17 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports:
+      - "8123:8123"  # HTTP
+      - "9000:9000"  # Native
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./storage/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+
 volumes:
   redpanda_data: {}
+  clickhouse_data: {}
