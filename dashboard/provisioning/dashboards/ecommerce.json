@@ -1,0 +1,65 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "E-commerce Events Dashboard",
+    "panels": [
+      {
+        "title": "Events per minute",
+        "type": "timeseries",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "query": "SELECT toStartOfMinute(timestamp) AS t, count() AS events FROM events_db.events WHERE timestamp >= now() - INTERVAL 1 HOUR GROUP BY t ORDER BY t"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "title": "Top Products (Page Views)",
+        "type": "barchart",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "query": "SELECT product_id, count() AS views FROM events_db.events WHERE event_type = 'page_view' GROUP BY product_id ORDER BY views DESC LIMIT 10"
+          }
+        ]
+      },
+      {
+        "title": "Conversion Funnel",
+        "type": "stat",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "query": "SELECT event_type, count() AS cnt FROM events_db.events WHERE event_type IN ('page_view', 'add_to_cart', 'purchase') GROUP BY event_type ORDER BY indexOf(['page_view', 'add_to_cart', 'purchase'], event_type)"
+          }
+        ]
+      },
+      {
+        "title": "Average Order Value (AOV)",
+        "type": "stat",
+        "datasource": "ClickHouse",
+        "targets": [
+          {
+            "query": "SELECT avg(value) AS aov FROM events_db.events WHERE event_type = 'purchase' AND value > 0"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyUSD"
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timezone": "browser",
+    "schemaVersion": 38
+  },
+  "overwrite": true
+}

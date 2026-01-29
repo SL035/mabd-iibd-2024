@@ -51,12 +51,12 @@ services:
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
 
   grafana:
-    image: grafana/grafana:10.3.3
+    image: grafana/grafana:11.3.0
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=grafana-clickhouse-datasource
+      - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource
     volumes:
       - ./dashboard/provisioning:/etc/grafana/provisioning
     depends_on:

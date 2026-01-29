@@ -42,13 +42,13 @@ def main():
                     raise KafkaException(msg.error())
 
             event = json.loads(msg.value().decode('utf-8'))
-            # Преобразуем строку ISO в datetime с временной зоной UTC
+            # Обработка формата ISO с Z (например, "2026-01-22T12:34:56.789Z")
             ts_str = event['timestamp']
             # Убираем лишние символы, если есть (например, +00:00 → Z)
-            if ts_str.endswith('+00:00'):
-                ts_str = ts_str[:-6] + 'Z'
+            if ts_str.endswith('Z'):
+                ts_str = ts_str[:-1] + '+00:00'
             # Парсим
-            event_time = datetime.fromisoformat(ts_str.replace('Z', '+00:00')).replace(tzinfo=pytz.UTC)
+            event_time = datetime.fromisoformat(ts_str).replace(tzinfo=pytz.UTC)
 
             batch.append([
                 event['event_id'],
